@@ -117,7 +117,7 @@ The goal of this website is to:
 
 ## 🌐 Live Demo
 
-👉 
+👉 https://cafe-craft-code.lovable.app
 
 ---
 
