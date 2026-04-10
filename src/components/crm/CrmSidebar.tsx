@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, BarChart3, UserPlus, LogOut, Zap } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,9 +15,22 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Zap } from "lucide-react";
 
-export function CrmSidebar() {
+export type CrmView = "dashboard" | "leads" | "charts";
+
+interface CrmSidebarProps {
+  activeView: CrmView;
+  onViewChange: (view: CrmView) => void;
+  onAddLead?: () => void;
+}
+
+const navItems = [
+  { key: "dashboard" as CrmView, label: "Dashboard", icon: LayoutDashboard },
+  { key: "leads" as CrmView, label: "Leads", icon: Users },
+  { key: "charts" as CrmView, label: "Charts", icon: BarChart3 },
+];
+
+export function CrmSidebar({ activeView, onViewChange, onAddLead }: CrmSidebarProps) {
   const { signOut, user } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -43,16 +56,30 @@ export function CrmSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.key}>
+                  <SidebarMenuButton
+                    isActive={activeView === item.key}
+                    tooltip={item.label}
+                    onClick={() => onViewChange(item.key)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {!collapsed && <span>{item.label}</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Actions</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive tooltip="Dashboard">
-                  <LayoutDashboard className="h-4 w-4" />
-                  {!collapsed && <span>Dashboard</span>}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Leads">
-                  <Users className="h-4 w-4" />
-                  {!collapsed && <span>Leads</span>}
+                <SidebarMenuButton tooltip="Add Lead" onClick={onAddLead}>
+                  <UserPlus className="h-4 w-4" />
+                  {!collapsed && <span>Add Lead</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

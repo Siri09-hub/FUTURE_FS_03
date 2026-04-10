@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { CrmSidebar } from "@/components/crm/CrmSidebar";
+import { CrmSidebar, type CrmView } from "@/components/crm/CrmSidebar";
 import { LeadTable } from "@/components/crm/LeadTable";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { NotesPanel } from "@/components/crm/NotesPanel";
@@ -26,12 +26,19 @@ import type { Database } from "@/integrations/supabase/types";
 type LeadStatus = Database["public"]["Enums"]["lead_status"];
 type SortOption = "name-asc" | "name-desc" | "date-newest" | "date-oldest";
 
+const viewTitles: Record<CrmView, string> = {
+  dashboard: "Dashboard",
+  leads: "Leads",
+  charts: "Analytics",
+};
+
 export default function DashboardPage() {
   const { data: leads = [], isLoading } = useLeads();
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
 
+  const [activeView, setActiveView] = useState<CrmView>("dashboard");
   const [formOpen, setFormOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [notesLead, setNotesLead] = useState<Lead | null>(null);
@@ -52,15 +59,10 @@ export default function DashboardPage() {
 
     result.sort((a, b) => {
       switch (sortBy) {
-        case "name-asc":
-          return a.name.localeCompare(b.name);
-        case "name-desc":
-          return b.name.localeCompare(a.name);
-        case "date-oldest":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case "date-newest":
-        default:
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "name-asc": return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        case "date-oldest": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
 
@@ -73,9 +75,7 @@ export default function DashboardPage() {
         onSuccess: () => { setFormOpen(false); setEditingLead(null); },
       });
     } else {
-      createLead.mutate(data, {
-        onSuccess: () => setFormOpen(false),
-      });
+      createLead.mutate(data, { onSuccess: () => setFormOpen(false) });
     }
   };
 
@@ -90,102 +90,99 @@ export default function DashboardPage() {
     }
   };
 
+  const openAddLead = () => {
+    setEditingLead(null);
+    setFormOpen(true);
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <CrmSidebar />
+        <CrmSidebar activeView={activeView} onViewChange={setActiveView} onAddLead={openAddLead} />
         <div className="flex-1 flex flex-col">
           <header className="h-14 flex items-center gap-4 border-b border-border px-4 lg:px-6">
             <SidebarTrigger />
-            <h1 className="text-lg font-heading font-bold text-foreground">Dashboard</h1>
+            <h1 className="text-lg font-heading font-bold text-foreground">{viewTitles[activeView]}</h1>
           </header>
 
           <main className="flex-1 p-4 lg:p-6 space-y-6 overflow-auto">
-            <StatsCards leads={leads} />
-            <LeadCharts leads={leads} />
+            {/* Dashboard view: stats + charts + recent leads */}
+            {activeView === "dashboard" && (
+              <>
+                <StatsCards leads={leads} />
+                <LeadCharts leads={leads} />
+              </>
+            )}
 
-            {/* Lead management controls */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 w-full sm:w-auto flex-wrap">
-                <div className="relative flex-1 min-w-[180px] max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search leads..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
+            {/* Charts-only view */}
+            {activeView === "charts" && (
+              <LeadCharts leads={leads} />
+            )}
+
+            {/* Leads view (also shown below dashboard) */}
+            {(activeView === "leads" || activeView === "dashboard") && (
+              <>
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                  <div className="flex gap-2 flex-1 w-full sm:w-auto flex-wrap">
+                    <div className="relative flex-1 min-w-[180px] max-w-sm">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[140px]"><SelectValue placeholder="All Status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="contacted">Contacted</SelectItem>
+                        <SelectItem value="converted">Converted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                      <SelectTrigger className="w-[160px]">
+                        <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date-newest">Newest First</SelectItem>
+                        <SelectItem value="date-oldest">Oldest First</SelectItem>
+                        <SelectItem value="name-asc">Name A–Z</SelectItem>
+                        <SelectItem value="name-desc">Name Z–A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={openAddLead}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Lead
+                  </Button>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="new">New</SelectItem>
-                    <SelectItem value="contacted">Contacted</SelectItem>
-                    <SelectItem value="converted">Converted</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                  <SelectTrigger className="w-[160px]">
-                    <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="date-newest">Newest First</SelectItem>
-                    <SelectItem value="date-oldest">Oldest First</SelectItem>
-                    <SelectItem value="name-asc">Name A–Z</SelectItem>
-                    <SelectItem value="name-desc">Name Z–A</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" /> Add Lead
-              </Button>
-            </div>
 
-            {isLoading ? (
-              <p className="text-muted-foreground text-center py-12">Loading leads...</p>
-            ) : (
-              <LeadTable
-                leads={filteredLeads}
-                onEdit={handleEdit}
-                onDelete={(id) => setDeleteId(id)}
-                onViewNotes={(lead) => setNotesLead(lead)}
-              />
+                {isLoading ? (
+                  <p className="text-muted-foreground text-center py-12">Loading leads...</p>
+                ) : (
+                  <LeadTable
+                    leads={filteredLeads}
+                    onEdit={handleEdit}
+                    onDelete={(id) => setDeleteId(id)}
+                    onViewNotes={(lead) => setNotesLead(lead)}
+                  />
+                )}
+              </>
             )}
           </main>
         </div>
       </div>
 
-      <LeadForm
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditingLead(null); }}
-        onSubmit={handleSubmit}
-        lead={editingLead}
-        loading={createLead.isPending || updateLead.isPending}
-      />
-
-      <NotesPanel
-        lead={notesLead}
-        open={!!notesLead}
-        onClose={() => setNotesLead(null)}
-      />
+      <LeadForm open={formOpen} onClose={() => { setFormOpen(false); setEditingLead(null); }} onSubmit={handleSubmit} lead={editingLead} loading={createLead.isPending || updateLead.isPending} />
+      <NotesPanel lead={notesLead} open={!!notesLead} onClose={() => setNotesLead(null)} />
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Delete Lead</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this lead and all associated notes.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This action cannot be undone. This will permanently delete this lead and all associated notes.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
