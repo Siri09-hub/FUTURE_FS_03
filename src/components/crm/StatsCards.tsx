@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, UserPlus, PhoneCall, CheckCircle } from "lucide-react";
+import { Users, UserPlus, PhoneCall, CheckCircle, TrendingUp } from "lucide-react";
 import type { Lead } from "@/hooks/useLeads";
 
 interface StatsCardsProps {
@@ -11,18 +11,20 @@ export function StatsCards({ leads }: StatsCardsProps) {
   const newCount = leads.filter((l) => l.status === "new").length;
   const contactedCount = leads.filter((l) => l.status === "contacted").length;
   const convertedCount = leads.filter((l) => l.status === "converted").length;
+  const conversionRate = total > 0 ? Math.round((convertedCount / total) * 100) : 0;
 
   const stats = [
     { label: "Total Leads", value: total, icon: Users, color: "text-primary" },
     { label: "New", value: newCount, icon: UserPlus, color: "text-primary" },
     { label: "Contacted", value: contactedCount, icon: PhoneCall, color: "text-accent" },
     { label: "Converted", value: convertedCount, icon: CheckCircle, color: "text-emerald-400" },
+    { label: "Conversion Rate", value: `${conversionRate}%`, icon: TrendingUp, color: "text-emerald-400" },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
       {stats.map((s) => (
-        <Card key={s.label} className="bg-card border-border">
+        <Card key={s.label} className="bg-card border-border transition-shadow hover:shadow-glow">
           <CardContent className="p-4 flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-secondary ${s.color}`}>
               <s.icon className="h-5 w-5" />
